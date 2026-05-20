@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Analyzer — GlobalData</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #181c27;
+  --surface2: #1f2435;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #e8eaf0;
+  --text2: #8b91a8;
+  --text3: #555c73;
+  --accent: #4e8cff;
+  --accent2: #2ecc8f;
+  --danger: #e05555;
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --s-marketed: #1D9E75;
+  --s-prer: #5DCAA5;
+  --s-p3: #4e8cff;
+  --s-p2: #7F77DD;
+  --s-p1: #AFA9EC;
+  --s-prec: #5a6080;
+  --s-disc: #3a3f54;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ── LAYOUT ── */
+.shell { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg); z-index: 100;
+  backdrop-filter: blur(12px);
+}
+.logo { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.logo span { color: var(--accent); }
+.version { font-size: 11px; font-family: var(--mono); color: var(--text3); }
+
+/* ── UPLOAD ── */
+.upload-section { padding: 60px 0 40px; }
+.drop-target {
+  border: 1.5px dashed var(--border2);
+  border-radius: 16px;
+  padding: 56px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+  position: relative; overflow: hidden;
+}
+.drop-target::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(78,140,255,.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.drop-target:hover, .drop-target.drag {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, #181c27 0%, #1a2038 100%);
+}
+.drop-target input { display: none; }
+.upload-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(78,140,255,.12);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 24px;
+}
+.drop-title { font-size: 17px; font-weight: 500; margin-bottom: 6px; }
+.drop-sub { font-size: 13px; color: var(--text2); }
+.drop-hint {
+  margin-top: 20px; font-size: 12px; color: var(--text3);
+  font-family: var(--mono);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  display: inline-block; padding: 4px 12px;
+}
+.status-msg { text-align: center; font-size: 13px; color: var(--text2); margin-top: 12px; min-height: 20px; }
+.status-msg.error { color: var(--danger); }
+
+/* ── DASHBOARD ── */
+#dashboard { display: none; }
+.ind-header {
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap; padding: 28px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.ind-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(78,140,255,.12);
+  border: 1px solid rgba(78,140,255,.25);
+  color: #7eb3ff;
+  padding: 5px 14px; border-radius: 20px;
+  font-size: 13px; font-weight: 500;
+}
+.ind-meta { font-size: 12px; color: var(--text3); }
+
+/* ── METRICS ── */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px; margin-bottom: 28px;
+}
+.metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  transition: border-color .15s;
+}
+.metric:hover { border-color: var(--border2); }
+.metric-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.metric-value { font-size: 28px; font-weight: 300; letter-spacing: -.02em; }
+.metric-value.green { color: var(--accent2); }
+.metric-value.blue { color: var(--accent); }
+
+/* ── TABS ── */
+.tab-bar {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px; overflow-x: auto;
+}
+.tab {
+  padding: 10px 20px; font-size: 13px; font-weight: 500;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  color: var(--text2); transition: all .15s; white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 12px; font-weight: 500; color: var(--text2);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title::before {
+  content: ''; display: block; width: 3px; height: 14px;
+  background: var(--accent); border-radius: 2px;
+}
+
+/* ── LEGEND ── */
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── CONTROLS ── */
+.controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
+.ctrl-select {
+  font-family: var(--font); font-size: 13px;
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border2);
+  background: var(--surface2); color: var(--text);
+  cursor: pointer; outline: none;
+  transition: border-color .15s;
+}
+.ctrl-select:hover, .ctrl-select:focus { border-color: var(--accent); }
+
+/* ── CHART WRAP ── */
+.chart-wrap { position: relative; width: 100%; }
+
+/* ── NOTE ── */
+.note {
+  font-size: 11.5px; color: var(--text3);
+  margin-top: 14px; padding: 8px 14px;
+  background: rgba(255,255,255,.025);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--border2);
+  line-height: 1.6;
+}
+
+/* ── DRILL TABLE ── */
+.drill-card { display: none; }
+.drill-title { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 12px; }
+.drill-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.drill-table th {
+  text-align: left; padding: 7px 10px;
+  color: var(--text3); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  border-bottom: 1px solid var(--border); background: var(--surface2);
+}
+.drill-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+.drill-table tr:last-child td { border-bottom: none; }
+.drill-table tr:hover td { background: rgba(255,255,255,.02); }
+.s-pill {
+  display: inline-block; font-size: 10px; padding: 2px 8px;
+  border-radius: 10px; font-weight: 500; color: #fff; white-space: nowrap;
+}
+
+/* ── FOOTER ── */
+.footer {
+  text-align: center; font-size: 11px; color: var(--text3);
+  padding: 24px; border-top: 1px solid var(--border); margin-top: 40px;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .topbar { padding: 14px 16px; }
+  .shell { padding: 0 14px 60px; }
+  .drop-target { padding: 36px 20px; }
+  .metric-value { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Pipeline<span>.</span>Analyzer</div>
+  <div class="version">GlobalData export · v1.0</div>
+</div>
+
+<div class="shell">
+  <!-- UPLOAD -->
+  <div class="upload-section">
+    <div class="drop-target" id="dropZone" onclick="document.getElementById('fileIn').click()">
+      <input type="file" id="fileIn" accept=".xlsx">
+      <div class="upload-icon">📂</div>
+      <div class="drop-title">Drop your GlobalData export here</div>
+      <div class="drop-sub">or click to browse for the file</div>
+      <div class="drop-hint">.xlsx files only</div>
+    </div>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard">
+    <div class="ind-header">
+      <span class="ind-pill" id="indPill">—</span>
+      <span class="ind-meta" id="indMeta"></span>
+    </div>
+
+    <div class="metrics" id="metricsRow"></div>
+
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab(0,this)">Pipeline overview</div>
+      <div class="tab" onclick="switchTab(1,this)">By modality</div>
+      <div class="tab" onclick="switchTab(2,this)">By MoA / Target</div>
+      <div class="tab" onclick="switchTab(3,this)">MoA by stage</div>
+    </div>
+
+    <!-- TAB 0 -->
+    <div id="tab0">
+      <div class="card">
+        <div class="card-title">Innovator drugs by pipeline stage</div>
+        <div class="legend" id="leg0"></div>
+        <div class="chart-wrap" style="height:270px"><canvas id="chart0"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Route of administration</div>
+        <div class="controls">
+          <select class="ctrl-select" id="roaStageFilter" onchange="renderRoA()">
+            <option value="all">All stages</option>
+          </select>
+        </div>
+        <div class="legend" id="leg1"></div>
+        <div class="chart-wrap" id="roaWrap" style="height:240px"><canvas id="chart1"></canvas></div>
+      </div>
+    </div>
+
+    <!-- TAB 1 -->
+    <div id="tab1" style="display:none">
+      <div class="card">
+        <div class="card-title">Pipeline by modality — stacked by stage</div>
+        <div class="legend" id="legMod"></div>
+        <div class="chart-wrap" style="height:290px"><canvas id="chartMod"></canvas></div>
+      </div>
+    </div>
+
+    <!-- TAB 2 -->
+    <div id="tab2" style="display:none">
+      <div class="card">
+        <div class="card-title">Pipeline by MoA or target — stacked by stage</div>
+        <div class="controls">
+          <select class="ctrl-select" id="dimSelect" onchange="renderDim()">
+            <option value="moa">Mechanism of action</option>
+            <option value="target">Target</option>
+          </select>
+          <select class="ctrl-select" id="topN" onchange="renderDim()">
+            <option value="10">Top 10</option>
+            <option value="15">Top 15</option>
+            <option value="20">Top 20</option>
+            <option value="999">All</option>
+          </select>
+        </div>
+        <div class="legend" id="legDim"></div>
+        <div class="chart-wrap" id="dimWrap"><canvas id="chartDim"></canvas></div>
+        <p class="note">MoA is the default — it includes the mechanism verb (agonist / antagonist / inhibitor), which Target omits. A drug with multiple MoAs is counted once per entry, so bar totals can exceed unique drug counts. Click a bar to drill into which drugs it contains.</p>
+      </div>
+      <div class="card drill-card" id="dimDrillCard">
+        <div class="drill-title" id="dimDrillTitle"></div>
+        <table class="drill-table"><thead><tr><th>Drug</th><th>Stage</th><th>Modality</th><th>MoA / Target</th></tr></thead>
+        <tbody id="dimDrillBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- TAB 3 -->
+    <div id="tab3" style="display:none">
+      <div class="card">
+        <div class="card-title">Distinct MoAs by pipeline stage</div>
+        <div class="legend" id="legMoaStage"></div>
+        <div class="chart-wrap" style="height:300px"><canvas id="chartMoaStage"></canvas></div>
+        <p class="note">Each bar shows the number of distinct MoAs among innovator drugs at that stage. Hover to see the full list. A MoA present at multiple stages (e.g. Insulin Receptor Agonist in both Marketed and Discontinued) appears in each — that is correct: the mechanism has drugs at different stages of their lifecycle.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Pipeline Analyzer · Upload a fresh GlobalData .xlsx at any time to switch indication</div>
+</div>
+
+<script>
+// ── CONSTANTS ──
+const EUROPE=new Set(["albania","andorra","austria","belarus","belgium","bosnia and herzegovina","bulgaria","croatia","cyprus","czech republic","denmark","estonia","finland","france","germany","greece","hungary","iceland","ireland","italy","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco","montenegro","netherlands","north macedonia","norway","poland","portugal","romania","russia","san marino","serbia","slovakia","slovenia","spain","sweden","switzerland","turkey","ukraine","united kingdom","vatican city"]);
+const GEO_TERMS=["global","united states","eu","japan","china","south korea",...EUROPE];
+const STAGE_ORDER=["Discontinued / Inactive","PreC","Phase I","Phase II","Phase III","Pre-R","Marketed"];
+const STAGE_COLORS={"Marketed":"#1D9E75","Pre-R":"#5DCAA5","Phase III":"#4e8cff","Phase II":"#7F77DD","Phase I":"#AFA9EC","PreC":"#5a6080","Discontinued / Inactive":"#3a3f54"};
+const PALETTE=["#4e8cff","#1D9E75","#e07b40","#7F77DD","#e8c44a","#D4537E","#5bc478","#a78bfa","#E24B4A","#38bdf8","#4B1528","#2C2C2A","#0C447C","#3B6D11","#8B0000","#27500A","#FF8C00","#4169E1"];
+
+// ── HELPERS ──
+function mapStage(s){
+  const x=(s||"").toLowerCase().trim();
+  if(["archived","discontinued","withdrawn","filing rejected/withdrawn","inactive","unknown"].includes(x)) return "Discontinued / Inactive";
+  if(["preclinical","discovery","ind/cta filed","phase 0"].includes(x)) return "PreC";
+  if(/^phase\s*i\b/.test(x)&&!/^phase\s*ii/.test(x)) return "Phase I";
+  if(/^phase\s*ii\b/.test(x)&&!/^phase\s*iii/.test(x)) return "Phase II";
+  if(/^phase\s*iii\b/.test(x)) return "Phase III";
+  if(["pre-registration","preregistration","pre registration"].includes(x)) return "Pre-R";
+  if(x==="marketed") return "Marketed";
+  return "Discontinued / Inactive";
+}
+function mapModality(m){
+  const mc=(m||"").trim();
+  if(!mc) return "Unknown";
+  if(mc==="Small Molecule") return "SMOLs";
+  if(["Synthetic Protein","Synthetic Peptide","Recombinant Protein","Recombinant Peptide","Recombinant Enzyme","Protein","Polysaccharide","Peptide","Fusion Protein","Enzyme","Blood Derivative"].some(v=>mc.includes(v))) return "Protein / Peptides";
+  if(["Antibody","Monoclonal Antibody","Single-Domain Antibody"].some(v=>mc.includes(v))&&!mc.includes("Drug Conjugate")) return "Antibodies";
+  if(mc.includes("Drug Conjugate")||mc.includes("Small Molecule Drug Conjugate")||mc==="Polymer") return "Drug Conjugates";
+  if(mc==="Biologic") return "Other Biologics";
+  if(["Antisense Oligonucleotide","Antisense RNAi","Aptamer"].some(v=>mc.includes(v))) return "Oligonucleotides";
+  if(mc.includes("Cell Therapy")&&!mc.includes("Gene")) return "Cell Therapy";
+  if(mc.toLowerCase().includes("gene")) return "Gene Therapy";
+  if(mc.includes("Vaccine")) return "Vaccines";
+  return "Other";
+}
+function geoOk(g){return GEO_TERMS.some(t=>(g||"").toLowerCase().includes(t));}
+function strictIndMatch(indStr,query){
+  const q=query.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp('(?:^|\\s*;\\s*)'+q+'(?:\\s*;\\s*|$)','i').test((indStr||"").trim());
+}
+function extractIndication(raw){
+  for(let i=0;i<20;i++){
+    const row=raw[i];if(!row) continue;
+    for(let j=0;j<row.length;j++){
+      if(typeof row[j]==="string"&&row[j].includes("Therapy Area/ Indication:")){
+        for(let k=j+1;k<row.length;k++){
+          if(row[k]&&typeof row[k]==="string"&&row[k].trim()) return row[k].trim();
+        }
+      }
+    }
+  }
+  return null;
+}
+function buildQuery(label){return label.replace(/\s*\([^()]*\)\s*$/,'').trim();}
+function splitSemi(val){return (val||"").toString().split(/\s*;\s*/).map(s=>s.trim()).filter(s=>s&&s!=="nan");}
+function buildLegend(id,items){
+  const el=document.getElementById(id);if(!el)return;
+  el.innerHTML=items.map(({label,color})=>`<span class="legend-item"><span class="legend-dot" style="background:${color}"></span>${label}</span>`).join("");
+}
+
+// ── STATE ──
+let chartInstances=[];
+let _innov=[], _stageMoaLists=[];
+
+function destroyCharts(){chartInstances.forEach(c=>c.destroy());chartInstances=[];}
+
+// ── PARSE ──
+function parseFile(file){
+  setStatus("Reading file…");
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:"array"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+      const indLabel=extractIndication(raw);
+      if(!indLabel){setStatus("Could not detect indication from file header.",true);return;}
+      const indQuery=buildQuery(indLabel);
+      let headerRow=-1;
+      for(let i=0;i<30;i++){if(raw[i]&&raw[i].some(c=>c==="Drug Id")){headerRow=i;break;}}
+      if(headerRow<0){setStatus("Could not find data headers.",true);return;}
+      const headers=raw[headerRow];
+      const col=n=>headers.indexOf(n);
+      const rows=raw.slice(headerRow+1).filter(r=>r.some(c=>c!==""));
+
+      const validIds=new Set();
+      rows.forEach(r=>{
+        if(strictIndMatch((r[col("Indication")]||"").toString(),indQuery))
+          validIds.add((r[col("Drug Id")]||"").toString());
+      });
+      if(!validIds.size){setStatus(`No drugs matched "${indQuery}".`,true);return;}
+
+      const byDrug={};
+      rows.forEach(r=>{
+        const id=(r[col("Drug Id")]||"").toString();
+        if(!validIds.has(id)) return;
+        if(!strictIndMatch((r[col("Indication")]||"").toString(),indQuery)) return;
+        if(!geoOk((r[col("Drug Geography")]||"").toString())) return;
+        if(!byDrug[id]){
+          byDrug[id]={id,
+            name:(r[col("Drug Name")]||"").toString().trim(),
+            stage:(r[col("Development Stage")]||"").toString().trim(),
+            drugType:(r[col("Drug Type")]||"").toString().trim(),
+            modality:(r[col("Molecule Type")]||"").toString().trim(),
+            roa:new Set(),moa:new Set(),target:new Set()
+          };
+        }
+        const d=byDrug[id];
+        splitSemi(r[col("Route of Administration")]).forEach(v=>d.roa.add(v));
+        splitSemi(r[col("Mechanism of Action")]).forEach(v=>d.moa.add(v));
+        splitSemi(r[col("Target")]).forEach(v=>d.target.add(v));
+      });
+
+      const drugs=Object.values(byDrug).map(d=>({...d,
+        stageBucket:mapStage(d.stage),modBucket:mapModality(d.modality),
+        roa:[...d.roa],moa:[...d.moa],target:[...d.target]
+      }));
+      const innov=drugs.filter(d=>d.drugType.toLowerCase().includes("innovator"));
+
+      setStatus("");
+      renderDashboard(drugs,innov,indQuery,indLabel);
+    }catch(err){setStatus("Error reading file: "+err.message,true);console.error(err);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setStatus(msg,isError=false){
+  const el=document.getElementById("statusMsg");
+  el.textContent=msg;
+  el.className="status-msg"+(isError?" error":"");
+}
+
+// ── RENDER DASHBOARD ──
+function renderDashboard(drugs,innov,indQuery,indLabel){
+  destroyCharts();
+  _innov=innov;
+
+  const sc=countByStage(innov);
+  const active=["Phase I","Phase II","Phase III","Pre-R","Marketed"].reduce((a,s)=>a+(sc[s]||0),0);
+
+  document.getElementById("indPill").textContent="⬡ "+indQuery;
+  document.getElementById("indMeta").textContent=`${innov.length} innovator drugs · ${drugs.length} total after geography filter`;
+
+  document.getElementById("metricsRow").innerHTML=`
+    <div class="metric"><div class="metric-label">Total innovators</div><div class="metric-value">${innov.length}</div></div>
+    <div class="metric"><div class="metric-label">Active pipeline</div><div class="metric-value blue">${active}</div></div>
+    <div class="metric"><div class="metric-label">Phase III</div><div class="metric-value">${sc["Phase III"]}</div></div>
+    <div class="metric"><div class="metric-label">Marketed</div><div class="metric-value green">${sc["Marketed"]}</div></div>
+  `;
+
+  // populate RoA stage filter
+  const roaSel=document.getElementById("roaStageFilter");
+  roaSel.innerHTML=`<option value="all">All stages</option>`+STAGE_ORDER.map(s=>`<option value="${s}">${s}</option>`).join("");
+
+  document.getElementById("dashboard").style.display="block";
+  document.getElementById("upload-section") && (document.getElementById("upload-section").style.paddingTop="20px");
+
+  // build stage->moa map for tab3
+  const stageMoaMap={};
+  STAGE_ORDER.forEach(s=>stageMoaMap[s]={moas:new Set(),drugs:[]});
+  innov.forEach(d=>{
+    const sb=d.stageBucket;
+    if(stageMoaMap[sb]){
+      stageMoaMap[sb].drugs.push(d);
+      d.moa.forEach(m=>stageMoaMap[sb].moas.add(m));
+    }
+  });
+  _stageMoaLists=STAGE_ORDER.map(s=>[...stageMoaMap[s].moas].sort());
+
+  buildChart0(innov,sc);
+  buildChartMod(innov);
+  renderRoA();
+  renderDim();
+  buildChartMoaStage();
+}
+
+function countByStage(arr){
+  const m={};STAGE_ORDER.forEach(s=>m[s]=0);
+  arr.forEach(d=>{if(m[d.stageBucket]!==undefined) m[d.stageBucket]++;});
+  return m;
+}
+
+// ── TAB SWITCH ──
+window.switchTab=function(i,el){
+  [0,1,2,3].forEach(j=>{document.getElementById("tab"+j).style.display=j===i?"block":"none";});
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  el.classList.add("active");
+};
+
+// ── CHART 0: stage bar ──
+function buildChart0(innov,sc){
+  const ctx=document.getElementById("chart0");if(!ctx)return;
+  buildLegend("leg0",STAGE_ORDER.map(s=>({label:s,color:STAGE_COLORS[s]})));
+  chartInstances.push(new Chart(ctx,{
+    type:"bar",
+    data:{labels:STAGE_ORDER,datasets:[{data:STAGE_ORDER.map(s=>sc[s]||0),backgroundColor:STAGE_ORDER.map(s=>STAGE_COLORS[s]),borderRadius:5,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw} drugs`},backgroundColor:"#1f2435",titleColor:"#e8eaf0",bodyColor:"#8b91a8",borderColor:"rgba(255,255,255,.08)",borderWidth:1}},
+      scales:{x:{grid:{display:false},ticks:{color:"#8b91a8",maxRotation:25},border:{color:"rgba(255,255,255,.06)"}},
+              y:{beginAtZero:true,grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"#8b91a8"},border:{color:"rgba(255,255,255,.06)"}}}}
+  }));
+}
+
+// ── CHART 1: RoA ──
+window.renderRoA=function(){
+  const stageF=document.getElementById("roaStageFilter")?.value||"all";
+  const filtered=stageF==="all"?_innov:_innov.filter(d=>d.stageBucket===stageF);
+  const cnt={};
+  filtered.forEach(d=>d.roa.forEach(r=>{if(r) cnt[r]=(cnt[r]||0)+1;}));
+  const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const labels=sorted.map(([k])=>k),data=sorted.map(([,v])=>v);
+  const colors=labels.map((_,i)=>PALETTE[i%PALETTE.length]);
+  const ctx=document.getElementById("chart1");if(!ctx)return;
+  const ex=chartInstances.find(c=>c.canvas===ctx);
+  if(ex){ex.destroy();chartInstances=chartInstances.filter(c=>c.canvas!==ctx);}
+  buildLegend("leg1",labels.map((l,i)=>({label:l,color:colors[i]})));
+  const h=Math.max(160,labels.length*38+80);
+  document.getElementById("roaWrap").style.height=h+"px";
+  chartInstances.push(new Chart(ctx,{
+    type:"bar",data:{labels,datasets:[{data,backgroundColor:colors,borderRadius:4,borderSkipped:false}]},
+    options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw} drugs`},backgroundColor:"#1f2435",titleColor:"#e8eaf0",bodyColor:"#8b91a8",borderColor:"rgba(255,255,255,.08)",borderWidth:1}},
+      scales:{x:{beginAtZero:true,grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"#8b91a8"},border:{color:"rgba(255,255,255,.06)"}},
+              y:{grid:{display:false},ticks:{color:"#8b91a8"},border:{color:"rgba(255,255,255,.06)"}}}}
+  }));
+};
+
+// ── CHART MOD ──
+function buildChartMod(innov){
+  const mods=[...new Set(innov.map(d=>d.modBucket))].filter(Boolean).sort();
+  const ctx=document.getElementById("chartMod");if(!ctx)return;
+  buildLegend("legMod",STAGE_ORDER.map(s=>({label:s,color:STAGE_COLORS[s]})));
+  chartInstances.push(new Chart(ctx,{
+    type:"bar",
+    data:{labels:mods,datasets:STAGE_ORDER.map(s=>({label:s,data:mods.map(m=>innov.filter(d=>d.modBucket===m&&d.stageBucket===s).length),backgroundColor:STAGE_COLORS[s],borderRadius:2}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:"#1f2435",titleColor:"#e8eaf0",bodyColor:"#8b91a8",borderColor:"rgba(255,255,255,.08)",borderWidth:1}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:"#8b91a8",maxRotation:30},border:{color:"rgba(255,255,255,.06)"}},
+              y:{stacked:true,beginAtZero:true,grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"#8b91a8"},border:{color:"rgba(255,255,255,.06)"}}}}
+  }));
+}
+
+// ── CHART DIM (MoA/Target) ──
+window.renderDim=function(){
+  const dim=document.getElementById("dimSelect")?.value||"moa";
+  const topN=parseInt(document.getElementById("topN")?.value||"10");
+  const isMoa=dim==="moa";
+  const cnt={};
+  _innov.forEach(d=>(isMoa?d.moa:d.target).forEach(v=>{if(v) cnt[v]=(cnt[v]||0)+1;}));
+  let entries=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+  if(topN<999) entries=entries.slice(0,topN);
+  const labels=entries.map(([k])=>k);
+  const datasets=STAGE_ORDER.map(s=>({
+    label:s,
+    data:labels.map(lbl=>_innov.filter(d=>(isMoa?d.moa:d.target).includes(lbl)&&d.stageBucket===s).length),
+    backgroundColor:STAGE_COLORS[s],borderRadius:2
+  }));
+  const ctx=document.getElementById("chartDim");if(!ctx)return;
+  const ex=chartInstances.find(c=>c.canvas===ctx);
+  if(ex){ex.destroy();chartInstances=chartInstances.filter(c=>c.canvas!==ctx);}
+  const h=Math.max(200,labels.length*46+100);
+  document.getElementById("dimWrap").style.height=h+"px";
+  buildLegend("legDim",STAGE_ORDER.map(s=>({label:s,color:STAGE_COLORS[s]})));
+  chartInstances.push(new Chart(ctx,{
+    type:"bar",data:{labels,datasets},
+    options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:"#1f2435",titleColor:"#e8eaf0",bodyColor:"#8b91a8",borderColor:"rgba(255,255,255,.08)",borderWidth:1,
+          callbacks:{title:i=>{const l=i[0].label;return l.length>60?l.match(/.{1,60}/g):l;},label:c=>`${c.dataset.label}: ${c.raw} drug${c.raw!==1?'s':''}`}}},
+      scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1,color:"#8b91a8"},grid:{color:"rgba(255,255,255,.04)"},border:{color:"rgba(255,255,255,.06)"}},
+              y:{stacked:true,grid:{display:false},ticks:{color:"#8b91a8",font:{size:11},callback:function(v){const l=this.getLabelForValue(v);return l.length>42?l.slice(0,40)+'…':l;}},border:{color:"rgba(255,255,255,.06)"}}},
+      onClick:(evt,items)=>{
+        if(!items.length)return;
+        showDimDrill(labels[items[0].index],isMoa);
+      }
+    }
+  }));
+};
+
+function showDimDrill(lbl,isMoa){
+  const matched=_innov.filter(d=>(isMoa?d.moa:d.target).includes(lbl));
+  document.getElementById("dimDrillTitle").textContent=`${isMoa?'MoA':'Target'}: ${lbl.length>80?lbl.slice(0,78)+'…':lbl} — ${matched.length} drug${matched.length!==1?'s':''}`;
+  document.getElementById("dimDrillBody").innerHTML=matched
+    .sort((a,b)=>STAGE_ORDER.indexOf(b.stageBucket)-STAGE_ORDER.indexOf(a.stageBucket))
+    .map(d=>`<tr>
+      <td style="font-weight:500">${d.name||d.id}</td>
+      <td><span class="s-pill" style="background:${STAGE_COLORS[d.stageBucket]}">${d.stageBucket}</span></td>
+      <td style="color:#8b91a8">${d.modality||'—'}</td>
+      <td style="color:#8b91a8;font-size:11px">${(isMoa?d.moa:d.target).join('; ')||'—'}</td>
+    </tr>`).join("");
+  const card=document.getElementById("dimDrillCard");
+  card.style.display="block";
+  card.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+// ── CHART MoA BY STAGE ──
+function buildChartMoaStage(){
+  const ctx=document.getElementById("chartMoaStage");if(!ctx)return;
+  const counts=STAGE_ORDER.map((_,i)=>_stageMoaLists[i].length);
+  const colors=STAGE_ORDER.map(s=>STAGE_COLORS[s]);
+  buildLegend("legMoaStage",STAGE_ORDER.map(s=>({label:s,color:STAGE_COLORS[s]})));
+  chartInstances.push(new Chart(ctx,{
+    type:"bar",
+    data:{labels:STAGE_ORDER,datasets:[{data:counts,backgroundColor:colors,borderRadius:5,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:"#1f2435",titleColor:"#e8eaf0",bodyColor:"#8b91a8",borderColor:"rgba(255,255,255,.08)",borderWidth:1,
+          padding:12,boxPadding:4,
+          callbacks:{
+            title:items=>`${items[0].label} — ${items[0].raw} distinct MoA${items[0].raw!==1?'s':''}`,
+            label:()=>null,
+            afterBody:items=>{
+              const moas=_stageMoaLists[items[0].dataIndex];
+              if(!moas||!moas.length) return['(no MoAs recorded)'];
+              return moas.flatMap(m=>{
+                const chunks=[];
+                for(let i=0;i<m.length;i+=52) chunks.push((i===0?'• ':' ')+m.slice(i,i+52));
+                return chunks;
+              });
+            }
+          }
+        }
+      },
+      scales:{x:{grid:{display:false},ticks:{color:"#8b91a8",maxRotation:25},border:{color:"rgba(255,255,255,.06)"}},
+              y:{beginAtZero:true,ticks:{stepSize:1,color:"#8b91a8"},grid:{color:"rgba(255,255,255,.04)"},border:{color:"rgba(255,255,255,.06)"},
+                 title:{display:true,text:'Distinct MoAs',color:"#555c73",font:{size:11}}}}
+    }
+  }));
+}
+
+// ── FILE INPUT WIRING ──
+document.getElementById("fileIn").addEventListener("change",e=>{if(e.target.files[0]) parseFile(e.target.files[0]);});
+const dz=document.getElementById("dropZone");
+dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");});
+dz.addEventListener("dragleave",()=>dz.classList.remove("drag"));
+dz.addEventListener("drop",e=>{
+  e.preventDefault();dz.classList.remove("drag");
+  const f=e.dataTransfer.files[0];
+  if(f&&f.name.endsWith(".xlsx")) parseFile(f);
+  else setStatus("Please drop an .xlsx file.",true);
+});
+</script>
+</body>
+</html>
