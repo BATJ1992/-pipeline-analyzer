@@ -207,7 +207,18 @@ function extractIndication(raw){
   }
   return null;
 }
-function buildQuery(label){return label.replace(/\s*\([^()]*\)\s*$/,'').trim();}
+function buildQuery(label){
+  // Only strip the last parenthetical if it is a therapy area suffix
+  // (i.e. the label has more than one parenthetical group, meaning the last one
+  // is the therapy area appended by GlobalData, not part of the indication name)
+  const allParens=label.match(/\([^()]*\)/g)||[];
+  if(allParens.length>=2){
+    // Strip last parenthetical (therapy area)
+    return label.replace(/\s*\([^()]*\)\s*$/,'').trim();
+  }
+  // Only one or zero parentheticals — keep as-is (it IS part of the indication name)
+  return label.trim();
+}
 function splitSemi(val){return (val||"").toString().replace(/\xa0/g,' ').split(/\s*;\s*/).map(s=>s.trim()).filter(s=>s&&s!=="nan"&&s!=="undefined");}
 function cleanStr(v){return (v||"").toString().replace(/\xa0/g,' ').trim();}
 function collapseU(arr){const u=[...new Set(arr.filter(x=>x&&x!=="nan"))];return u.length?u.join(", "):"";}
@@ -261,25 +272,17 @@ function parseFile(file){
       const desc=readSheet(wb,"Detailed Drug Description");
       const reg =readSheet(wb,"Regulatory Information");
 
-      // Step 1a — find Drug IDs that have at least one geo-passing row ANYWHERE (matching R's read_sheet geo filter)
-      const geoPassIds=new Set();
-      basic.rows.forEach(r=>{
-        if(geoOk(cleanStr(r[basic.col("Drug Geography")])))
-          geoPassIds.add(cleanStr(r[basic.col("Drug Id")]));
-      });
-
-      // Step 1b — from those, find Drug IDs that also have at least one indication-matching row
+      // Step 1 — find Drug IDs with at least one row passing BOTH geo AND ind
+      // This matches R exactly: filter_geo applied first, then ind_matches on same set
       const validIds=new Set();
       basic.rows.forEach(r=>{
-        const id=cleanStr(r[basic.col("Drug Id")]);
-        if(!geoPassIds.has(id)) return;
-        if(strictIndMatch(cleanStr(r[basic.col("Indication")]),_indQuery))
-          validIds.add(id);
+        if(!geoOk(cleanStr(r[basic.col("Drug Geography")]))) return;
+        if(!strictIndMatch(cleanStr(r[basic.col("Indication")]),_indQuery)) return;
+        validIds.add(cleanStr(r[basic.col("Drug Id")]));
       });
       if(!validIds.size){setStatus(`No drugs matched "${_indQuery}".`,true);return;}
 
-      // Step 2 — build from basic sheet: use indication-matching rows only (for stage, MoA etc)
-      // but drug is included as long as it passed geo anywhere (matching R behaviour)
+      // Step 2 — build drug profiles from indication-matching rows only
       const byDrug={};
       basic.rows.forEach(r=>{
         const id=cleanStr(r[basic.col("Drug Id")]);
