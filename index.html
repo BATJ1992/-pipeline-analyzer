@@ -471,7 +471,7 @@ function renderDashboard(drugs,innov,indQuery){
   const sc=countByStage(innov);
   const active=["Phase I","Phase II","Phase III","Pre-R","Marketed"].reduce((a,s)=>a+(sc[s]||0),0);
   document.getElementById("indPill").textContent="⬡ "+indQuery;
-  document.getElementById("indMeta").textContent=`${innov.length} innovator drugs · ${drugs.length} total after geography filter`;
+  document.getElementById("indMeta").textContent="";
   document.getElementById("metricsRow").innerHTML=`
     <div class="metric"><div class="metric-label">Total innovators</div><div class="metric-value">${innov.length}</div></div>
     <div class="metric"><div class="metric-label">Active pipeline</div><div class="metric-value blue">${active}</div></div>
