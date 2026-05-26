@@ -321,6 +321,7 @@ function parseFile(file){
         comp.rows.forEach(r=>{
           const id=cleanStr(r[comp.col("Drug Id")]);
           if(!byDrug[id]) return;
+          if(!geoOk(cleanStr(r[comp.col("Drug Geography")]))) return;
           const cn=cleanStr(r[comp.col("Company Name")]);
           const hq=cleanStr(r[comp.col("Headquarters")]);
           const rel=cleanStr(r[comp.col("Independent/Parent/Subsidiary/Joint Venture")]);
@@ -341,6 +342,7 @@ function parseFile(file){
         rev.rows.forEach(r=>{
           const id=cleanStr(r[rev.col("Drug Id")]);
           if(!byDrug[id]) return;
+          if(!geoOk(cleanStr(r[rev.col("Drug Geography")]))) return;
           if(!strictIndMatch(cleanStr(r[rev.col("Indication")]),_indQuery)) return;
           const dt=cleanStr(r[rev.col("Designation Type")]);
           if(dt&&dt!=="nan"){if(!desMap[id]) desMap[id]=new Set();desMap[id].add(dt);}
@@ -354,6 +356,7 @@ function parseFile(file){
         mkt.rows.forEach(r=>{
           const id=cleanStr(r[mkt.col("Drug Id")]);
           if(!byDrug[id]) return;
+          if(!geoOk(cleanStr(r[mkt.col("Drug Geography")]))) return;
           const df=cleanStr(r[mkt.col("Dosage Frequency")]);
           if(df&&df!=="nan"){if(!dosMap[id]) dosMap[id]=new Set();dosMap[id].add(df);}
         });
@@ -366,6 +369,7 @@ function parseFile(file){
         reg.rows.forEach(r=>{
           const id=cleanStr(r[reg.col("Drug Id")]);
           if(!byDrug[id]) return;
+          if(!geoOk(cleanStr(r[reg.col("Drug Geography")]))) return;
           const ra=cleanStr(r[reg.col("Route of Admin")]);
           if(ra&&ra!=="nan"){if(!regMap[id]) regMap[id]=new Set();regMap[id].add(ra);}
         });
@@ -392,6 +396,7 @@ function parseFile(file){
         desc.rows.forEach(r=>{
           const id=cleanStr(r[desc.col("Drug Id")]);
           if(!byDrug[id]) return;
+          if(!geoOk(cleanStr(r[desc.col("Drug Geography")]))) return;
           if(!strictIndMatch(cleanStr(r[desc.col("Indication")]),_indQuery)) return;
           if(!descMap[id]) descMap[id]={dd:new Set(),md:new Set(),sd:new Set(),ed:new Set()};
           const dd=cleanStr(r[desc.col("Drug Description")]);if(dd&&dd!=="nan") descMap[id].dd.add(dd);
