@@ -438,7 +438,6 @@ function parseFile(file){
         brandName:[...d.brandName].join(", "),
         aliasName:[...d.aliasName].join(", ")
       }))
-        .filter(d=>hqOk(d.hq))                        // HQ must be in inclusion list
         .filter(d=>highestStageOk(d.highestStage));    // Highest stage must be active
       const innov=drugs.filter(d=>d.drugType.toLowerCase().includes("innovator"));
 
