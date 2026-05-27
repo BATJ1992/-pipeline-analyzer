@@ -266,12 +266,13 @@ function buildLegend(id,items){
 function readSheet(wb,sheetName){
   if(!wb.SheetNames.includes(sheetName)) return null;
   const ws=wb.Sheets[sheetName];
-  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:"",range:0});
   let headerRow=-1;
   for(let i=0;i<30;i++){if(raw[i]&&raw[i].some(c=>c==="Drug Id")){headerRow=i;break;}}
   if(headerRow<0) return null;
   const headers=raw[headerRow].map(h=>cleanStr(h));
-  const col=n=>headers.indexOf(n);
+  // col() returns the index, or a large safe number that gives undefined (not -1 which wraps)
+  const col=n=>{const i=headers.indexOf(n);return i>=0?i:9999;};
   const rows=raw.slice(headerRow+1).filter(r=>r.some(c=>c!=="")).filter(r=>{const id=cleanStr(r[col("Drug Id")]);return id&&id!=="nan";});
   return{headers,col,rows};
 }
@@ -359,11 +360,12 @@ function parseFile(file){
           };
         }
         const d=byDrug[id];
-        const bn=cleanStr(r[basic.col("Brand Name")]);if(bn&&bn!=="nan") d.brandName.add(bn);
+        if(!d) return;
+        const bn=cleanStr(r[basic.col("Brand Name")]||"");if(bn&&bn!=="nan") d.brandName.add(bn);
         const an=cleanStr(r[basic.col("Alias Name")]||"");if(an&&an!=="nan") d.aliasName.add(an);
-        splitSemi(r[basic.col("Route of Administration")]).forEach(v=>d.roa.add(v));
-        splitSemi(r[basic.col("Mechanism of Action")]).forEach(v=>d.moa.add(v));
-        splitSemi(r[basic.col("Target")]).forEach(v=>d.target.add(v));
+        const roaCol=basic.col("Route of Administration");if(roaCol>=0) splitSemi(r[roaCol]).forEach(v=>d.roa.add(v));
+        const moaCol=basic.col("Mechanism of Action");if(moaCol>=0) splitSemi(r[moaCol]).forEach(v=>d.moa.add(v));
+        const tgtCol=basic.col("Target");if(tgtCol>=0) splitSemi(r[tgtCol]).forEach(v=>d.target.add(v));
       });
 
       // Company HQ
