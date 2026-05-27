@@ -230,12 +230,21 @@ function strictIndMatch(indStr,query){
   return new RegExp('(?:^|\\s*;\\s*)'+q+'(?:\\s*;\\s*|$)','i').test((indStr||"").trim());
 }
 function extractIndication(raw){
-  for(let i=0;i<20;i++){
+  for(let i=0;i<30;i++){
     const row=raw[i];if(!row) continue;
     for(let j=0;j<row.length;j++){
       if(typeof row[j]==="string"&&row[j].includes("Therapy Area/ Indication:")){
+        // value may be in same row next column
         for(let k=j+1;k<row.length;k++){
           if(row[k]&&typeof row[k]==="string"&&row[k].trim()) return row[k].trim();
+        }
+        // or in next rows
+        for(let ni=i+1;ni<Math.min(i+4,raw.length);ni++){
+          if(raw[ni]){
+            for(let k=0;k<raw[ni].length;k++){
+              if(raw[ni][k]&&typeof raw[ni][k]==="string"&&raw[ni][k].trim()) return raw[ni][k].trim();
+            }
+          }
         }
       }
     }
@@ -288,12 +297,23 @@ function parseFile(file){
   const reader=new FileReader();
   reader.onload=e=>{
     try{
-      const wb=XLSX.read(e.target.result,{type:"array"});
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array",cellDates:false,cellNF:false,cellStyles:false});
       const basic=readSheet(wb,"Basic Drug Information");
       if(!basic){setStatus("Could not find 'Basic Drug Information' sheet.",true);return;}
-      const ws0=wb.Sheets[wb.SheetNames[0]];
-      const raw0=XLSX.utils.sheet_to_json(ws0,{header:1,defval:""});
+      // Read indication from header rows of Basic Drug Information sheet
+      const ws0=wb.Sheets["Basic Drug Information"];
+      const raw0=XLSX.utils.sheet_to_json(ws0,{header:1,defval:"",range:0});
       _indLabel=extractIndication(raw0)||"";
+      if(!_indLabel){
+        // Fallback: use first distinct Indication value from data
+        const indCol=basic.col("Indication");
+        if(indCol>=0){
+          for(const r of basic.rows){
+            const v=cleanStr(r[indCol]);
+            if(v&&v!=="nan"){_indLabel=v.trim();break;}
+          }
+        }
+      }
       if(!_indLabel){setStatus("Could not detect indication from file header.",true);return;}
       _indQuery=buildQuery(_indLabel);
 
