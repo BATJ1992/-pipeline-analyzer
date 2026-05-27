@@ -327,15 +327,18 @@ function parseFile(file){
       const salesSheet=readSheet(wb,"Sales Details");
 
       // Step 1 — find Drug IDs passing geo AND ind
+      console.log("Step 1: finding valid Drug IDs");
       const validIds=new Set();
       basic.rows.forEach(r=>{
         if(!geoOk(cleanStr(r[basic.col("Drug Geography")]))) return;
         if(!strictIndMatch(cleanStr(r[basic.col("Indication")]),_indQuery)) return;
         validIds.add(cleanStr(r[basic.col("Drug Id")]));
       });
+      console.log("Valid IDs found:", validIds.size);
       if(!validIds.size){setStatus(`No drugs matched "${_indQuery}".`,true);return;}
 
       // Step 2 — build drug profiles
+      console.log("Step 2: building drug profiles");
       const byDrug={};
       basic.rows.forEach(r=>{
         const id=cleanStr(r[basic.col("Drug Id")]);
@@ -368,6 +371,8 @@ function parseFile(file){
         const tgtCol=basic.col("Target");if(tgtCol>=0) splitSemi(r[tgtCol]).forEach(v=>d.target.add(v));
       });
 
+      console.log("Step 2 complete, drugs built:", Object.keys(byDrug).length);
+
       // Company HQ
       if(comp){
         const rankRel=s=>{const l=(s||"").toLowerCase();return l.includes("parent")?1:l.includes("independent")?2:3;};
@@ -390,6 +395,7 @@ function parseFile(file){
         });
       }
 
+      console.log("Company HQ done");
       // Designation
       if(rev){
         const desMap={};
@@ -404,6 +410,7 @@ function parseFile(file){
         Object.entries(desMap).forEach(([id,s])=>{if(byDrug[id]) byDrug[id].designation=[...s].join(", ")||"None";});
       }
 
+      console.log("Designation done");
       // Dosing
       if(mkt){
         const dosMap={};
@@ -417,6 +424,7 @@ function parseFile(file){
         Object.entries(dosMap).forEach(([id,s])=>{if(byDrug[id]) byDrug[id].dosing=[...s].join(", ");});
       }
 
+      console.log("Dosing done");
       // Regulatory RoA
       if(reg){
         const regMap={};
@@ -430,6 +438,7 @@ function parseFile(file){
         Object.entries(regMap).forEach(([id,s])=>{if(byDrug[id]) byDrug[id].regulatoryRoa=[...s].join(", ");});
       }
 
+      console.log("Regulatory RoA done");
       // Gene names
       if(tgt){
         const geneMap={};
@@ -444,6 +453,7 @@ function parseFile(file){
         Object.entries(geneMap).forEach(([id,s])=>{if(byDrug[id]) byDrug[id].geneName=[...s].join("; ");});
       }
 
+      console.log("Gene names done");
       // Descriptions
       if(desc){
         const descMap={};
@@ -468,6 +478,7 @@ function parseFile(file){
         });
       }
 
+      console.log("Descriptions done");
       // Sales data — aggregate per Drug Id (sum across all rows, take max to avoid double-counting)
       _salesData={};
       if(salesSheet){
@@ -491,6 +502,7 @@ function parseFile(file){
         });
       }
 
+      console.log("Sales done, _salesData entries:", Object.keys(_salesData).length);
       // Finalise — apply highest stage filter
       const drugs=Object.values(byDrug).map(d=>({...d,
         stageBucket:mapStage(d.stage),
@@ -504,7 +516,7 @@ function parseFile(file){
       _allDrugs=drugs;_innov=innov;
       setStatus("");
       renderDashboard(drugs,innov,_indQuery);
-    }catch(err){setStatus("Error: "+err.message,true);console.error(err);}
+    }catch(err){setStatus("Error: "+err.message,true);console.error(err);console.error(err.stack);}
   };
   reader.readAsArrayBuffer(file);
 }
