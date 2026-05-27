@@ -594,7 +594,7 @@ function renderDashboard(drugs,innov,indQuery){
   document.getElementById("dashboard").style.display="block";
   const stageMoaMap={};
   STAGE_ORDER.forEach(s=>stageMoaMap[s]=new Set());
-  innov.forEach(d=>d.moa.forEach(m=>stageMoaMap[d.stageBucket].add(m)));
+  innov.forEach(d=>d.moa.forEach(m=>{if(stageMoaMap[d.stageBucket]) stageMoaMap[d.stageBucket].add(m);}));
   _stageMoaLists=STAGE_ORDER.map(s=>[...stageMoaMap[s]].sort());
   buildChart0(innov,sc);
   buildChartRoA(innov);
