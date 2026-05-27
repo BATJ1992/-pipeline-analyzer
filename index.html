@@ -434,9 +434,9 @@ function parseFile(file){
 
 // ── DOWNLOAD EXCEL ──
 window.downloadExcel=function(){
-  if(!_allDrugs.length) return;
-  // Build rows matching the R consolidated output columns exactly
-  const rows=_allDrugs.map(d=>({
+  if(!_innov.length) return;
+  // Build rows matching the R consolidated output columns exactly — innovator only
+  const rows=_innov.map(d=>({
     "Drug Id":                                d.id,
     "Drug Name":                              d.name,
     "Generic Name":                           d.genericName,
