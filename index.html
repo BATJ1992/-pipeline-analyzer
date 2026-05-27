@@ -195,6 +195,17 @@ function geoOk(g){
   return GEO_TERMS.some(t=>{const re=new RegExp('(?:^|[,;\\s])'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?:[,;\\s]|$)');return re.test(gl);});
 }
 function hqOk(hq){return HQ_TERMS.has((hq||"").toLowerCase().trim());}
+function highestStageOk(s){
+  const x=(s||"").toLowerCase().trim();
+  // Keep: Marketed, Phase III (incl Ph2/3), Phase II (incl Ph1/2), Phase I, PreClinical/IND/Ph0
+  // Exclude: Inactive, Discontinued, Discovery, Unknown, and anything else
+  if(x==="marketed") return true;
+  if(/^phase\s*iii\b/.test(x)) return true;
+  if(/^phase\s*ii\b/.test(x)) return true;
+  if(/^phase\s*i\b/.test(x)) return true;
+  if(["preclinical","ind/cta filed","phase 0","pre-clinical"].includes(x)) return true;
+  return false;
+}
 function strictIndMatch(indStr,query){
   const q=query.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   return new RegExp('(?:^|\\s*;\\s*)'+q+'(?:\\s*;\\s*|$)','i').test((indStr||"").trim());
@@ -426,7 +437,9 @@ function parseFile(file){
         roa:[...d.roa],moa:[...d.moa],target:[...d.target],
         brandName:[...d.brandName].join(", "),
         aliasName:[...d.aliasName].join(", ")
-      })).filter(d=>hqOk(d.hq));  // exclude drugs whose company HQ is not in inclusion list
+      }))
+        .filter(d=>hqOk(d.hq))                        // HQ must be in inclusion list
+        .filter(d=>highestStageOk(d.highestStage));    // Highest stage must be active
       const innov=drugs.filter(d=>d.drugType.toLowerCase().includes("innovator"));
 
       _allDrugs=drugs;_innov=innov;
