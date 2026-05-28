@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0f1117;--surface:#181c27;--surface2:#1f2435;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#e8eaf0;--text2:#8b91a8;--text3:#555c73;--accent:#4e8cff;--accent2:#2ecc8f;--danger:#e05555;--font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--radius:10px;--radius-sm:6px}
+:root{--bg:#0f1117;--surface:#181c27;--surface2:#1f2435;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#e8eaf0;--text2:#8b91a8;--text3:#555c73;--accent:#0090AF;--accent2:#00C882;--danger:#e05555;--font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--radius:10px;--radius-sm:6px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:15px}
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
@@ -72,7 +72,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .sales-table tr:last-child td{border-bottom:none}
 .sales-table tr:hover td{background:rgba(255,255,255,.02)}
 .sales-bar-bg{background:rgba(255,255,255,.06);border-radius:3px;height:6px;min-width:60px;position:relative;overflow:hidden}
-.sales-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#4e8cff,#2ecc8f);transition:width .4s ease}
+.sales-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#0090AF,#00C882);transition:width .4s ease}
 .no-sales{color:var(--text3);font-style:italic;text-align:center;padding:32px;font-size:13px}
 @media(max-width:600px){.topbar{padding:14px 16px}.shell{padding:0 14px 60px}.drop-target{padding:36px 20px}.metric-value{font-size:22px}}
 </style>
@@ -180,8 +180,32 @@ const EUROPE=new Set(["albania","andorra","austria","belarus","belgium","bosnia 
 const GEO_TERMS=["global","united states","united states of america","eu","japan","china","south korea",...EUROPE];
 const HQ_TERMS=new Set(["united states","united states of america","japan","china","south korea",...EUROPE]);
 const STAGE_ORDER=["Discontinued / Inactive","PreC","Phase I","Phase II","Phase III","Pre-R","Marketed"];
-const STAGE_COLORS={"Marketed":"#1D9E75","Pre-R":"#5DCAA5","Phase III":"#4e8cff","Phase II":"#7F77DD","Phase I":"#AFA9EC","PreC":"#5a6080","Discontinued / Inactive":"#3a3f54"};
-const PALETTE=["#4e8cff","#1D9E75","#e07b40","#7F77DD","#e8c44a","#D4537E","#5bc478","#a78bfa","#E24B4A","#38bdf8","#4B1528","#2C2C2A","#0C447C","#3B6D11","#8B0000","#27500A","#FF8C00","#4169E1","#999999"];
+// BII brand colour palette from R script
+const BII={
+  teal_dark:"#00374D", teal:"#005F78", teal_mid:"#0090AF", teal_light:"#66C4D8", teal_pale:"#CCE8F0",
+  green_dark:"#004A44", green:"#007268", green_mid:"#00A896", green_light:"#6ED0C4", green_pale:"#CCEDEA",
+  mint_dark:"#005C38", mint:"#009060", mint_mid:"#00C882", mint_light:"#6EDEB0", mint_pale:"#CCEFDF",
+  pink_dark:"#7A2850", pink:"#B85080", pink_mid:"#D880AA", pink_light:"#ECAACB", pink_pale:"#F8DDE9",
+  red:"#CC1414", orange:"#F08010", yellow:"#F0C800", lime:"#A0C800",
+  gray_mid:"#7A7A7A", gray_light:"#C8C8C8"
+};
+// Stage colours using BII palette — early stages cool/dark, late stages warm/bright
+const STAGE_COLORS={
+  "Marketed":              BII.mint_mid,
+  "Pre-R":                 BII.green_mid,
+  "Phase III":             BII.teal_mid,
+  "Phase II":              BII.teal_light,
+  "Phase I":               BII.teal_pale,
+  "PreC":                  BII.gray_mid,
+  "Discontinued / Inactive": BII.gray_light
+};
+// Categorical palette matching R's bii_cat_palette order (high-contrast, sorted alphabetically in charts)
+const PALETTE=[
+  BII.teal, BII.green, BII.mint, BII.pink, BII.orange,
+  BII.teal_mid, BII.green_mid, BII.mint_mid, BII.pink_mid,
+  BII.teal_light, BII.green_light, BII.mint_light, BII.pink_light,
+  BII.red, BII.lime, BII.yellow, BII.gray_mid, BII.teal_dark, BII.green_dark
+];
 const TOOLTIP_OPTS={backgroundColor:"#1f2435",titleColor:"#e8eaf0",bodyColor:"#8b91a8",borderColor:"rgba(255,255,255,.08)",borderWidth:1};
 
 // ── HELPERS ──
@@ -633,7 +657,7 @@ function buildChartRoA(innov){
   const cats=[...topKeys,"Other"].filter(c=>c==="Other"||topKeys.has(c));
   // assign colours to RoA categories
   const catColors={};[...topKeys].forEach((k,i)=>catColors[k]=PALETTE[i%PALETTE.length]);
-  catColors["Other"]="#3a3f54";
+  catColors["Other"]=BII.gray_mid;
   // build datasets: one per RoA category, data = count per stage
   const datasets=cats.map(cat=>({
     label:cat,
@@ -676,7 +700,7 @@ window.renderDim=function(){
   const {topKeys,getCategory}=topNMap(_innov,d=>d.moa,topN);
   const cats=[...topKeys,"Other"];
   const catColors={};[...topKeys].forEach((k,i)=>catColors[k]=PALETTE[i%PALETTE.length]);
-  catColors["Other"]="#3a3f54";
+  catColors["Other"]=BII.gray_mid;
   const datasets=cats.map(cat=>({
     label:cat,
     data:STAGE_ORDER.map(stage=>_innov.filter(d=>d.stageBucket===stage&&d.moa.some(m=>getCategory(m)===cat)).length),
