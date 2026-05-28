@@ -249,8 +249,14 @@ function highestStageOk(s){
   return true;
 }
 function strictIndMatch(indStr,query){
+  // Escape all regex special characters in the query
   const q=query.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  return new RegExp('(?:^|\\s*;\\s*)'+q+'(?:\\s*;\\s*|$)','i').test((indStr||"").trim());
+  // Normalise indication string: lowercase + collapse whitespace
+  const ind=(indStr||"").toLowerCase().replace(/\s+/g,' ').trim();
+  // Pattern: query must be a complete semicolon-delimited segment
+  // (?:^|;)\s* handles start-of-string or after semicolon with any whitespace
+  // \s*(?:;|$) handles before semicolon or end-of-string with any whitespace
+  return new RegExp('(?:^|;)\\s*'+q+'\\s*(?:;|$)').test(ind);
 }
 function extractIndication(raw){
   for(let i=0;i<30;i++){
