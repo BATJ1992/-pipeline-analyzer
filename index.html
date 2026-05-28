@@ -179,40 +179,40 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 const EUROPE=new Set(["albania","andorra","austria","belarus","belgium","bosnia and herzegovina","bulgaria","croatia","cyprus","czech republic","denmark","estonia","finland","france","germany","greece","hungary","iceland","ireland","italy","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco","montenegro","netherlands","north macedonia","norway","poland","portugal","romania","russia","san marino","serbia","slovakia","slovenia","spain","sweden","switzerland","turkey","ukraine","united kingdom","vatican city"]);
 const GEO_TERMS=["global","united states","united states of america","eu","japan","china","south korea",...EUROPE];
 const HQ_TERMS=new Set(["united states","united states of america","japan","china","south korea",...EUROPE]);
-const ACTIVE_STAGES=["PreC","Phase I","Phase II","Phase III","Marketed","Others"];
-const STAGE_ORDER=["PreC","Phase I","Phase II","Phase III","Marketed","Others"];
-const STAGE_COLORS={"Marketed":"#1D9E75","Phase III":"#4e8cff","Phase II":"#7F77DD","Phase I":"#AFA9EC","PreC":"#5a6080","Others":"#3a3f54"};
+const STAGE_ORDER=["Discontinued / Inactive","PreC","Phase I","Phase II","Phase III","Pre-R","Marketed"];
+const STAGE_COLORS={"Marketed":"#1D9E75","Pre-R":"#5DCAA5","Phase III":"#4e8cff","Phase II":"#7F77DD","Phase I":"#AFA9EC","PreC":"#5a6080","Discontinued / Inactive":"#3a3f54"};
 const PALETTE=["#4e8cff","#1D9E75","#e07b40","#7F77DD","#e8c44a","#D4537E","#5bc478","#a78bfa","#E24B4A","#38bdf8","#4B1528","#2C2C2A","#0C447C","#3B6D11","#8B0000","#27500A","#FF8C00","#4169E1","#999999"];
 const TOOLTIP_OPTS={backgroundColor:"#1f2435",titleColor:"#e8eaf0",bodyColor:"#8b91a8",borderColor:"rgba(255,255,255,.08)",borderWidth:1};
 
 // ── HELPERS ──
 function mapStage(s){
-  const x=(s||"").toLowerCase().trim();
-  // Marketed
+  const x=(s||"").toString().replace(/\s+/g,' ').trim().toLowerCase();
+  if(["inactive","withdrawn","discontinued","withdrawn (marketed)","archived","unknown"].includes(x)) return "Discontinued / Inactive";
+  if(["preclinical","discovery","ind/cta filed","phase 0"].includes(x)) return "PreC";
+  if(x.startsWith("phase i") &&!x.startsWith("phase ii")) return "Phase I";
+  if(x.startsWith("phase ii")&&!x.startsWith("phase iii")) return "Phase II";
+  if(x.startsWith("phase iii")) return "Phase III";
+  if(["pre-registration","preregistration","pre registration"].includes(x)) return "Pre-R";
   if(x==="marketed") return "Marketed";
-  // Phase III — includes Pre-Registration
-  if(/^phase\s*iii\b/.test(x)||x==="pre-registration"||x==="preregistration"||x==="pre registration") return "Phase III";
-  // Phase II
-  if(/^phase\s*ii\b/.test(x)&&!/^phase\s*iii/.test(x)) return "Phase II";
-  // Phase I
-  if(/^phase\s*i\b/.test(x)&&!/^phase\s*ii/.test(x)) return "Phase I";
-  // PreC — includes IND/CTA Filed, Preclinical, Discovery
-  if(["preclinical","pre-clinical","ind/cta filed","phase 0","discovery"].includes(x)) return "PreC";
-  // Others — Inactive, Discontinued, Withdrawn (Marketed), anything else
-  return "Others";
+  return "Discontinued / Inactive"; // matches R's TRUE ~ "Discontinued / Inactive"
 }
 function mapModality(m){
   const mc=(m||"").trim();
-  if(!mc) return "QC: uncounted";
+  if(!mc||mc==="undisclosed") return "undisclosed";
   if(mc==="Small Molecule") return "SMOLs";
-  if(["Synthetic Protein","Synthetic Peptide","Recombinant Protein","Recombinant Peptide","Recombinant Enzyme","Recombinant Peptide; Recombinant Protein","Protein","Polysaccharide","Peptide","Fusion Protein","Enzyme","Blood Derivative"].some(v=>mc===v||mc.includes(v))) return "Protein / Peptides";
-  if(["Antibody","Monoclonal Antibody","Monoclonal antibody","Monoclonal Antibody; Synthetic Peptide"].includes(mc)) return "Antibodies";
-  if(/single-domain antibody/i.test(mc)&&!mc.includes("Drug Conjugate")) return "Antibodies";
-  if(["Antibody Drug Conjugate (ADC)","Small Molecule Drug Conjugate","Polymer"].includes(mc)||mc.includes("Drug Conjugate")) return "Drug Conjugates";
+  if(["Synthetic Protein","Synthetic Peptide","Recombinant Protein","Recombinant Peptide",
+      "Recombinant Enzyme","Recombinant Peptide; Recombinant Protein","Protein","Polysaccharide",
+      "Peptide","Fusion Protein","Enzyme","Blood Derivative"].includes(mc)) return "Protein / Peptides";
+  if(["Antibody","Monoclonal Antibody","Monoclonal antibody",
+      "Monoclonal Antibody; Synthetic Peptide","Single-Domain Antibody (sdAb)"].includes(mc)) return "Antibodies";
+  if(["Antibody Drug Conjugate (ADC)","Small Molecule Drug Conjugate","Polymer"].includes(mc)) return "Drug Conjugates";
   if(mc==="Biologic") return "Other Biologics";
-  if(["Antisense Oligonucleotide","Antisense RNAi Oligonucleotide","Aptamer"].some(v=>mc===v||mc.includes(v))) return "Oligonucleotides";
+  if(["Antisense Oligonucleotide","Oligonucleotide","Antisense RNAi Oligonucleotide",
+      "Aptamer","siRNA"].includes(mc)) return "Oligonucleotides";
+  if(mc==="mRNA") return "mRNA";
   if(mc==="Cell Therapy") return "Cell Therapy";
-  if(["Gene Therapy","Gene-Modified Cell Therapy"].includes(mc)||mc.toLowerCase().includes("gene therapy")) return "Gene Therapy";
+  if(["Gene Therapy","Gene-Modified Cell Therapy"].includes(mc)) return "Gene Therapy";
+  if(mc==="Recombinant Vector Vaccine") return "Vector Vaccine";
   return "QC: uncounted";
 }
 function geoOk(g){
@@ -355,6 +355,8 @@ function parseFile(file){
             drugType:    cleanStr(r[basic.col("Drug Type")]),
             modality:    cleanStr(r[basic.col("Molecule Type")]),
             monoCombо:   cleanStr(r[basic.col("Mono/Combination Drug")]||""),
+            inactiveDate:cleanStr(r[basic.col("Inactive/Discontinued Date")]||""),
+            discReason:  cleanStr(r[basic.col("Reason for Discontinuation")]||""),
             aliasName:   new Set(),
             roa:new Set(),moa:new Set(),target:new Set(),
             hq:"",parentSub:"",designation:"None",dosing:"",regulatoryRoa:"",geneName:"",
@@ -522,8 +524,9 @@ function parseFile(file){
 
 // ── DOWNLOAD EXCEL ──
 window.downloadExcel=function(){
-  if(!_innov.length) return;
-  const rows=_innov.map(d=>({
+  if(!_allDrugs.length) return;
+  const und=v=>(!v||v.trim()===""||v==="nan")?"undisclosed":v;
+  const rows=_allDrugs.map(d=>({
     "Drug Id":                                d.id,
     "Drug Name":                              d.name,
     "Generic Name":                           d.genericName,
@@ -533,15 +536,17 @@ window.downloadExcel=function(){
     "Parent or Subsidiary":                   d.parentSub,
     "Therapy Area":                           d.therapyArea,
     "Indication":                             _indQuery,
-    "Development Stage for query indication": d.stage,
+    "Development Stage for query indication": mapStage(d.stage),
     "Highest development stage":              d.highestStage,
+    "Inactive/Discontinued Date":             d.inactiveDate,
+    "Reason for Discontinuation":             d.discReason,
     "Alias Name":                             d.aliasName,
-    "RoA":                                    d.roa.join("; "),
+    "RoA":                                    und(d.roa.join("; ")),
     "Regulatory RoA":                         d.regulatoryRoa,
-    "Target":                                 d.target.join("; "),
+    "Target":                                 und(d.target.join("; ")),
     "Gene Name":                              d.geneName,
-    "MoA":                                    d.moa.join("; "),
-    "Modality":                               d.modality,
+    "MoA":                                    und(d.moa.join("; ")),
+    "Modality":                               und(d.modality),
     "Drug Type":                              d.drugType,
     "Mono/Combo":                             d.monoCombо,
     "Dosing":                                 d.dosing,
@@ -554,7 +559,7 @@ window.downloadExcel=function(){
     "2031 Forecast (USD M)":                  _salesData[d.id]?_salesData[d.id].s2031||"":"",
   }));
   const ws=XLSX.utils.json_to_sheet(rows);
-  const colWidths=[10,25,25,20,25,20,25,20,45,20,20,30,20,15,30,15,35,20,15,12,20,25,60,60,60,60,15,15];
+  const colWidths=[10,25,25,20,25,20,25,20,45,20,20,18,25,30,20,15,30,15,35,20,15,12,20,25,60,60,60,60,15,15];
   ws["!cols"]=colWidths.map(w=>({wch:w}));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Consolidated");
@@ -586,10 +591,10 @@ function renderDashboard(drugs,innov,indQuery){
   document.getElementById("indMeta").textContent="";
   document.getElementById("metricsRow").innerHTML=`
     <div class="metric"><div class="metric-label">Total innovators</div><div class="metric-value">${innov.length}</div></div>
-    <div class="metric"><div class="metric-label">Active pipeline</div><div class="metric-value blue">${["Phase I","Phase II","Phase III","Marketed"].reduce((a,s)=>a+(sc[s]||0),0)}</div></div>
-    <div class="metric"><div class="metric-label">Phase III</div><div class="metric-value">${sc["Phase III"]||0}</div></div>
+    <div class="metric"><div class="metric-label">Active pipeline</div><div class="metric-value blue">${["Phase I","Phase II","Phase III","Pre-R","Marketed"].reduce((a,s)=>a+(sc[s]||0),0)}</div></div>
+    <div class="metric"><div class="metric-label">Phase III + Pre-R</div><div class="metric-value">${(sc["Phase III"]||0)+(sc["Pre-R"]||0)}</div></div>
     <div class="metric"><div class="metric-label">Marketed</div><div class="metric-value green">${sc["Marketed"]||0}</div></div>
-    <div class="metric"><div class="metric-label">Others</div><div class="metric-value">${sc["Others"]||0}</div></div>
+    <div class="metric"><div class="metric-label">Discontinued</div><div class="metric-value">${sc["Discontinued / Inactive"]||0}</div></div>
   `;
   document.getElementById("dashboard").style.display="block";
   const stageMoaMap={};
